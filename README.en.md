@@ -15,6 +15,35 @@ A portable Kugou Music player built on the [FoloToy AI Passport](https://github.
 | Playlist browsing | Lists playlists (e.g. "My Favorites") and tracks with pagination |
 | Online playback | Fetches the mp3 URL via Kugou's signed `/v5/url` endpoint, decodes with Helix MP3, outputs over ES8311 |
 
+## Button Guide
+
+The device has **3 physical buttons**: Up, Down, and OK. Their functions depend on the current page:
+
+| Page | Button | Action |
+| --- | --- | --- |
+| QR login | OK click | Start QR login (logged in → playlists; no network → demo mode) |
+| QR login | OK long | Refresh the QR code |
+| QR login | DOWN long | Enter Wi-Fi settings |
+| Wi-Fi list | UP / DOWN click | Select a network |
+| Wi-Fi list | OK click | Connect (open networks connect directly; secured ones open the keyboard) |
+| Wi-Fi list | OK long | Re-scan networks |
+| Wi-Fi list | UP long | Back to QR login |
+| Password keyboard | UP / DOWN click | Change character |
+| Password keyboard | OK click | Enter the current character |
+| Password keyboard | UP long | Switch character group (lower → upper → digits → symbols) |
+| Password keyboard | DOWN long | Delete last character |
+| Password keyboard | OK long | Submit (if password set) / Cancel (if empty) |
+| Playlists | UP / DOWN click | Select a playlist |
+| Playlists | OK click | Open the playlist |
+| Playlists | OK long | Log out |
+| Tracks | UP / DOWN click | Select a track (auto paginates at the end) |
+| Tracks | OK click | Play the selected track |
+| Tracks | OK long | Back to playlists |
+| Player | OK click | Play / pause |
+| Player | UP click | Previous track |
+| Player | DOWN click | Next track |
+| Player | UP / DOWN long | Back to track list |
+
 ## Hardware
 
 - FoloToy AI Passport board (ESP32-C3, 8 MB Flash)
