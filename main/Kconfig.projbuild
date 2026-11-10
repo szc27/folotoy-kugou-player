@@ -1,0 +1,27 @@
+menu "Kugou Music Player"
+
+config KUGOU_WIFI_SSID
+    string "Wi-Fi SSID (empty keeps the player in offline demo mode)"
+    default ""
+    help
+        Optional preset credentials. When empty the device scans for networks
+        on first boot and offers a three-button on-screen keyboard.
+        Saved credentials live in NVS, never in the firmware image.
+
+config KUGOU_WIFI_PASSPHRASE
+    string "Wi-Fi passphrase"
+    default ""
+
+config KUGOU_QR_URL_TEMPLATE
+    string "External QR login page URL template (%s is replaced by the QR key)"
+    default "https://h5.kugou.com/apps/loginQRCode/html/index.html?qrcode=%s"
+    help
+        The device talks to Kugou endpoints directly (login-user.kugou.com and
+        gateway.kugou.com); no relay service is involved. %s is replaced by the
+        key returned by /v2/qrcode.
+
+config KUGOU_QR_FALLBACK_URL
+    string "QR content while the API is not configured"
+    default "https://h5.kugou.com/"
+
+endmenu

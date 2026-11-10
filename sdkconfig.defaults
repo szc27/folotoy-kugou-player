@@ -1,0 +1,119 @@
+# --- 目标芯片 ---
+CONFIG_IDF_TARGET="esp32c3"
+# 注:ESP32-C3 无 PSRAM,故不设 CONFIG_SPIRAM。
+
+# --- Flash ---
+# FoloToy AI Passport 当前产品/固件基线使用 8MB Flash。
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+# 固定 8MB 镜像头，关闭 detect，便于 idf.py merge-bin。
+CONFIG_ESPTOOLPY_HEADER_FLASHSIZE_UPDATE=n
+# 默认模板只保留 NVS、PHY data 和占用剩余空间的 factory app；用户可按需修改。
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
+
+# --- 控制台:UART0 自定义引脚(TX=GPIO11/RX=GPIO12)---
+# 不用 UART0 默认引脚:其默认 TX=GPIO21 与本板背光引脚冲突。
+# 改用 GPIO11/12(避开背光)，便于通过 UART 串口查看应用日志。
+CONFIG_ESP_CONSOLE_UART_CUSTOM=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
+CONFIG_ESP_CONSOLE_UART_TX_GPIO=11
+CONFIG_ESP_CONSOLE_UART_RX_GPIO=12
+
+# --- LVGL ---
+CONFIG_LV_COLOR_DEPTH_16=y
+# display refresh period 决定"内容失效"到"开始往屏幕推像素"之间的最大等待。
+# 本应用是按键驱动、不是动画驱动:按一下键之后最多要等一个 refr period 屏幕才开始动,
+# 所以这个值直接进按键手感的延迟里。20ms 时单击会白等最多 20ms,收敛到 10ms。
+# (代价只是 LVGL 任务被唤醒得勤一点;屏幕无失效时 LVGL 不会真的重绘。)
+CONFIG_LV_DEF_REFR_PERIOD=10
+CONFIG_LV_FONT_MONTSERRAT_14=y
+CONFIG_LV_FONT_MONTSERRAT_20=y
+# 扫码登录页用 LVGL 自带的 qrcode 画布生成二维码（104x104、I1 位图，约 1.4KB）。
+CONFIG_LV_USE_QRCODE=y
+# LVGL 内置 malloc 池大小(字节)。无 PSRAM 在线音乐播放器要同时扛住
+# TLS 会话、Helix 解码与音频 DMA，RAM 很紧。实测 16KB 时歌单页(4行)能渲染，
+# 但曲目页(5行卡片) lv_malloc 耗尽 → 写 NULL+8 崩溃(Store access fault)。
+# 32KB 兼顾：渲染余量足够，同时比默认 64KB 省 32KB 给 WiFi/mbedTLS。
+# ⚠ 必须用 LV_MEM_SIZE(字节)：LV_MEM_SIZE_KILOBYTES 已废弃，会被忽略，
+#   导致 fallback 到默认 64KB(65536)，白白吃掉 48KB DRAM。
+CONFIG_LV_MEM_SIZE=24576
+# LVGL 软件渲染的临时图层缓冲(圆角/阴影/透明混合用,按需分配)。
+# 默认 24576 太大,与本应用 240x320 单缓冲抢内部 DMA RAM,导致 Wi-Fi
+# 的 6 个 static RX buffer 分配失败。降到 8192(8KB) 已够简单圆角 UI。
+CONFIG_LV_DRAW_LAYER_SIMPLE_BUF_SIZE=8192
+
+# --- 系统 ---
+CONFIG_FREERTOS_HZ=1000
+# esp_timer 任务栈：Wi-Fi 的 phy 全量校准(首次 RF 校准数据缺失/checksum 失败时)
+# 会在 esp_timer 任务里执行,默认 3584 不够,直接栈溢出 panic 重启。加到 10KB。
+CONFIG_ESP_TIMER_TASK_STACK_SIZE=10240
+
+# --- Bluetooth LE / NimBLE（本应用不启用，保留原配置备查）---
+# 米家云控制器只用 Wi-Fi + HTTPS。ESP32-C3 无 PSRAM，NimBLE 的静态占用会挤掉
+# mbedTLS 会话所需的 DRAM，因此这里关闭 BLE。以下是 iPhone 通知应用的原始配置，
+# 切回该应用时取消注释即可。
+# ESP32-C3 仅支持 BLE。iPhone 消息提醒采用 Apple 的 ANCS 角色模型
+# （与 ESP-IDF examples/bluetooth/nimble/ble_ancs 一致）：
+#   本机做 BLE 外设并广播设备名 → 用户在 iPhone「设置 > 蓝牙」里点它连接
+#   → 本机在该连接上做 GATT Client，发现并订阅 iPhone 上的
+#     ANCS Notification Source / Data Source，用 Control Point 取属性。
+# GAP 角色与 GATT 角色互不影响，但 NimBLE 把 GATT Client 能力挂在
+# CONFIG_BT_NIMBLE_ROLE_CENTRAL 上：port/include/esp_nimble_cfg.h 里
+#   MYNEWT_VAL_BLE_GATT_DISC_SVC_UUID / DISC_CHR_UUID / DISC_ALL_DSCS /
+#   BLE_GATT_WRITE ... = MYNEWT_VAL_BLE_ROLE_CENTRAL
+# 关掉 CENTRAL 就等于把 ble_gattc_disc_* / ble_gattc_write_flat 从库里摘掉
+# （链接期 undefined reference）。所以做 ANCS Consumer 必须：
+#   CENTRAL=y     -> 才能发现/订阅/写入 iPhone 的 ANCS 特征
+#   PERIPHERAL=y  -> 可被连接，承载 GAP/GATT 服务
+#   BROADCASTER=y -> 发广播让 iPhone 搜到
+# OBSERVER（扫描）用不到就关掉，省一点 Flash/RAM。
+# CONFIG_BT_ENABLED=y
+# CONFIG_BT_NIMBLE_ENABLED=y
+# CONFIG_BT_NIMBLE_ROLE_CENTRAL=y
+# CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+# CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
+# CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
+# CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+# CONFIG_BT_NIMBLE_HOST_BASED_PRIVACY=n
+# 配对信息（含 iPhone 的 LTK/IRK）落 NVS，重启后免重新配对。
+# CONFIG_BT_NIMBLE_NVS_PERSIST=y
+# CONFIG_BT_NIMBLE_MAX_BONDS=2
+# ANCS 需要加密链路：保留 Just Works + LE Secure Connections。
+# CONFIG_BT_NIMBLE_SM_LEGACY=y
+# CONFIG_BT_NIMBLE_SM_SC=y
+# CONFIG_BT_NIMBLE_SM_SC_ONLY=n
+# 诊断配对失败需要 NimBLE 自己的 SMP 日志（Pairing Failed 的原因码只在那一层打印）。
+# CONFIG_BT_NIMBLE_LOG_LEVEL_DEBUG=y
+# CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=256
+
+# --- WiFi ---
+# 无 PSRAM：WiFi 缓冲是 heap 大头。实测 2 静态 / 4 动态 RX / 4 动态 TX（每缓冲约 1.6KB）
+# 足以稳定跑 HTTPS 分块拉流与 API 请求，比默认 2/32/32（约 100KB）省出近 90KB DRAM，
+# 把省下的空间留给 mbedTLS 会话与音频链路的 heap。
+CONFIG_ESP_WIFI_ENABLED=y
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=2
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=4
+CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM=4
+CONFIG_ESP_WIFI_STATIC_RX_MGMT_BUFFER=n
+CONFIG_ESP_WIFI_DYNAMIC_RX_MGMT_BUFFER=y
+CONFIG_ESP_WIFI_RX_MGMT_BUF_NUM_DEF=12
+CONFIG_ESP_WIFI_AMPDU_RX_ENABLED=n
+CONFIG_ESP_WIFI_AMPDU_TX_ENABLED=n
+CONFIG_ESP_WIFI_MGMT_SBUF_NUM=16
+
+# --- 酷狗直连：HTTPS / 时间同步 ---
+# 设备端直连酷狗需要准确的 Unix 秒级时间生成 clienttime 签名，开机后走 SNTP 同步。
+# 证书用 ESP-IDF 内置根证书 bundle，避免把 CA 私钥或自建证书写进仓库。
+CONFIG_ESP_HTTP_CLIENT_ENABLE_HTTPS=y
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y
+# 无 PSRAM：mbedTLS 必须开动态缓冲，TLS 记录按需分配，否则固定缓冲 + 音频缓冲
+# + LVGL 池会把 C3 的 DRAM 吃穿。入向 8KB（动态）足够酷狗 HTTPS 握手与响应头，
+# 出向 1KB 足够签名后的小请求体。两个并发 TLS 上下文（API + 音频流）各按需分配，
+# 比固定 16KB 大幅省 heap。
+CONFIG_MBEDTLS_DYNAMIC_BUFFER=y
+CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=8192
+CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=1024
+CONFIG_MBEDTLS_SSL_MAX_CONTENT_LEN=8192
+CONFIG_LWIP_SNTP_MAX_SERVERS=1

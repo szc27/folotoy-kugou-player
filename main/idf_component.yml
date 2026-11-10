@@ -1,0 +1,5 @@
+## IDF Component Manager manifest for the Kugou direct player.
+dependencies:
+  idf: ">=5.5.3,<5.6.0"
+  # Helix MP3 decoder used by main/kugou_stream.c (mp3dec.h).
+  chmorgan/esp-libhelix-mp3: "^1.0.1"
